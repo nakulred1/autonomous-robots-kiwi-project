@@ -1,0 +1,27 @@
+FROM arm32v7/ubuntu:18.04
+
+ENV DEBIAN_FRONTEND noninteractive
+
+ENV QEMU_EXECVE 1
+COPY ./cross-build/cross-build-start /usr/bin/cross-build-start
+COPY ./cross-build/cross-build-end /usr/bin/cross-build-end
+COPY ./cross-build/qemu-arm-static /usr/bin/qemu-arm-static
+COPY ./cross-build/sh-shim /usr/bin/sh-shim
+
+RUN ["cross-build-start"]
+
+RUN apt-get update -y && \
+		apt-get upgrade -y && \
+		apt-get dist-upgrade -y && \
+		apt-get install -y --no-install-recommends \
+			python3 \
+			python3-protobuf \
+			python3-sysv-ipc \
+			python3-numpy \
+			python3-opencv && \
+		apt-get clean
+
+RUN mkdir /opt/sources
+WORKDIR /opt/sources
+
+RUN ["cross-build-end"]
