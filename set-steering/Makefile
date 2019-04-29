@@ -1,16 +1,16 @@
-all: cluonDataStructures_pb2.py opendlv_standard_message_set_v0_9_6_pb2.py
+all: cluonDataStructures_pb2.py message_set_pb2.py
 
-cluonDataStructures.proto: cluonDataStructures.odvd
-	cluon-msc --proto --out=cluonDataStructures.proto cluonDataStructures.odvd
+cluonDataStructures.proto: ../message-set/cluonDataStructures.odvd
+	cluon-msc --proto --out=cluonDataStructures.proto ../message-set/cluonDataStructures.odvd
 
 cluonDataStructures_pb2.py: cluonDataStructures.proto
 	protoc --python_out=. cluonDataStructures.proto
 
-opendlv_standard_message_set_v0_9_6.proto: opendlv-standard-message-set-v0.9.6.odvd
-	cluon-msc --proto --out=opendlv_standard_message_set_v0_9_6.proto opendlv-standard-message-set-v0.9.6.odvd
+message_set.proto: ../message-set/message-set.odvd
+	cluon-msc --proto --out=message_set.proto ../message-set/message-set.odvd
 
-opendlv_standard_message_set_v0_9_6_pb2.py: opendlv_standard_message_set_v0_9_6.proto
-	protoc --python_out=. opendlv_standard_message_set_v0_9_6.proto
+message_set_pb2.py: message_set.proto
+	protoc --python_out=. message_set.proto
 
 clean:
 	rm -f *_pb2.py *pyc *.proto 

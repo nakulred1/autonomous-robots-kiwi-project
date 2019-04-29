@@ -5,7 +5,7 @@
 
 import sys, getopt, time, atexit
 import OD4Session
-import opendlv_standard_message_set_v0_9_6_pb2 as messages
+import message_set_pb2 as messages
 
 def usage():
     print('usage:', sys.argv[0], '--cid=<cid> [--freq=<freq>] [commands...]')
