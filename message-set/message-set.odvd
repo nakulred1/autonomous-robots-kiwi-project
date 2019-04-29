@@ -366,6 +366,8 @@ message opendlv.logic.cognition.GroundSpeedLimit [id = 1192] {
 }
 
 message tme290.Cones [id = 1500] {
-  bytes blueCones [id = 1];
-  bytes yellowCones [id = 2];
+  uint16 xSize [id = 1];
+  uint16 ySize [id = 2];
+  bytes blueCones [id = 3];
+  bytes yellowCones [id = 4];
 }
