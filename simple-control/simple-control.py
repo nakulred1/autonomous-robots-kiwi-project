@@ -77,6 +77,10 @@ def onCones(msg, senderStamp, timeStamps):
     ylwCones = np.frombuffer(msg.yellowCones, dtype='uint16').reshape(-1, 2)
     ylwCones = [tuple(pt) for pt in ylwCones.tolist()]
 
+    if len(bluCones) == 0 and len(ylwCones) == 0:
+        # Stop the car if it can't see any cones
+        pedalPosition = 0
+        return
     # TODO: reverse this if blue cones are on the right
     if len(bluCones) == 0: bluCones = [(0, 0)]
     if len(ylwCones) == 0: ylwCones = [(xSize-1, 0)]
