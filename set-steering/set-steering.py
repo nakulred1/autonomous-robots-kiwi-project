@@ -55,8 +55,8 @@ for arg in args:
         print('allowed pedalPosition range: [-1.0, 0.25]')
         sys.exit(1)
 
-    if groundSteering < -0.66 or groundSteering > 0.66:
-        print('allowed groundSteering range: [-0.66, 0.66]')
+    if groundSteering < -0.2 or groundSteering > 0.2:
+        print('allowed groundSteering range: [-0.2, 0.2]')
         sys.exit(1)
 
     steps.append({'pedalPosition': pedalPosition,
