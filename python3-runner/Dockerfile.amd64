@@ -1,0 +1,23 @@
+FROM ubuntu:18.04
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update -y && \
+		apt-get install -y --no-install-recommends software-properties-common && \
+		add-apt-repository ppa:chrberger/libcluon && \
+		apt-get update -y && \
+		apt-get upgrade -y && \
+		apt-get dist-upgrade -y && \
+		apt-get install -y --no-install-recommends \
+			python3 \
+			python3-protobuf \
+			python3-sysv-ipc \
+			python3-numpy \
+			python3-opencv \
+			make \
+			protobuf-compiler \
+			libcluon && \
+		apt-get clean
+
+RUN mkdir /opt/sources
+WORKDIR /opt/sources
