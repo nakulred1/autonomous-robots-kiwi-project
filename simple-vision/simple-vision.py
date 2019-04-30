@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys, signal
 import sysv_ipc
 import numpy as np
 import cv2
@@ -32,6 +33,11 @@ def findCones(img, hsvLow, hsvHigh):
         conePos.append((x + int(w/2), y + h))
     conePos.sort(key=lambda pt: pt[1])
     return conePos
+
+
+def onSigterm():
+    sys.exit(0)
+signal.signal(signal.SIGTERM, onSigterm)
 
 
 imgPath = "/tmp/img.argb"

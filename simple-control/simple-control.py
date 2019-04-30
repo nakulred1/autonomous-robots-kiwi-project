@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys, time, atexit, signal
 import numpy as np
 import OD4Session
 import message_set_pb2 as messages
@@ -8,7 +9,16 @@ import message_set_pb2 as messages
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
+velocity = 0.05 # constant car velocity
+maxGroundSteering = 0.2
+
 cid = 112
+freq = 10
+
+
+lastConeMsg = time.time()
+pedalPosition = 0
+groundSteering = 0
 
 
 def addPoints(cones, w, h):
@@ -56,6 +66,10 @@ def distanceFromMiddle(pts, xMid, y):
 
 
 def onCones(msg, senderStamp, timeStamps):
+    global lastConeMsg
+    global pedalPosition
+    global groundSteering
+
     xSize = msg.xSize
     ySize = msg.ySize
     bluCones = np.frombuffer(msg.blueCones, dtype='uint16').reshape(-1, 2)
@@ -74,11 +88,48 @@ def onCones(msg, senderStamp, timeStamps):
     xMid = round(xSize / 2)
     dx = distanceFromMiddle(midPts, xMid, ySteering)
     steer = dx / (xSize / 2)
-    print(steer) # TODO: send steering messages based on steer
 
+    lastConeMsg = time.time()
+    pedalPosition = velocity
+    groundSteering = steer * maxGroundSteering
+    print('pedalPosition=%f groundSteering=%f' %
+            (pedalPosition, groundSteering))
+
+def stop():
+    print('stopping')
+
+    # send a short burst if some of them don't arrive
+    for i in range(10):
+        pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
+        pedalPositionRequest.position = 0
+        session.send(1086, pedalPositionRequest.SerializeToString())
+        time.sleep(1/freq)
+
+def onSigterm():
+    sys.exit(0)
+signal.signal(signal.SIGTERM, onSigterm)
 
 session = OD4Session.OD4Session(cid)
 session.registerMessageCallback(1500, onCones, messages.tme290_Cones)
+atexit.register(stop)
 session.connect()
 
-input()
+while True:
+    # Stop the car if we haven't received any cone messages for a long time
+    if time.time() - lastConeMsg > 1:
+        pedalPosition = 0
+        groundSteering = 0
+
+    groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
+    groundSteeringRequest.groundSteering = groundSteering
+    session.send(1090, groundSteeringRequest.SerializeToString())
+
+    # don't know why, but if this is not here the second message often gets
+    # dropped...
+    time.sleep(0.001)
+
+    pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
+    pedalPositionRequest.position = pedalPosition
+    session.send(1086, pedalPositionRequest.SerializeToString())
+
+    time.sleep(1/freq)
