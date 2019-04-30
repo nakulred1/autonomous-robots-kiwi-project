@@ -68,4 +68,5 @@ while True:
     cv2.arrowedLine(img, (xMid, ySteering), (xMid + dx, ySteering), (0, 0, 255))
 
     cv2.imshow("img", img)
+    
     cv2.waitKey(1)
