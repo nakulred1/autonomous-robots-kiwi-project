@@ -12,13 +12,10 @@ ySteering = 100
 velocity = 0.05 # constant car velocity
 maxGroundSteering = 0.2
 
+stoppingDistance = 0.5 # stop the car when front distance is less than this
+
 cid = 112
 freq = 10
-
-
-lastConeMsg = time.time()
-pedalPosition = 0
-groundSteering = 0
 
 
 def addPoints(cones, w, h):
@@ -65,10 +62,13 @@ def distanceFromMiddle(pts, xMid, y):
     return round(x - xMid)
 
 
+lastConeMsg = time.time()
+noCones = False
+steer = 0
 def onCones(msg, senderStamp, timeStamps):
     global lastConeMsg
-    global pedalPosition
-    global groundSteering
+    global noCones
+    global steer
 
     xSize = msg.xSize
     ySize = msg.ySize
@@ -79,7 +79,7 @@ def onCones(msg, senderStamp, timeStamps):
 
     if len(bluCones) == 0 and len(ylwCones) == 0:
         # Stop the car if it can't see any cones
-        pedalPosition = 0
+        noCones = True
         return
     # TODO: reverse this if blue cones are on the right
     if len(bluCones) == 0: bluCones = [(0, 0)]
@@ -91,13 +91,24 @@ def onCones(msg, senderStamp, timeStamps):
 
     xMid = round(xSize / 2)
     dx = distanceFromMiddle(midPts, xMid, ySteering)
-    steer = dx / (xSize / 2)
 
     lastConeMsg = time.time()
-    pedalPosition = velocity
+    noCones = False
+    steer = dx / (xSize / 2)
     groundSteering = steer * maxGroundSteering
-    print('pedalPosition=%f groundSteering=%f' %
-            (pedalPosition, groundSteering))
+    print('steer=%f' % steer)
+
+distances = { "front": 0.0, "left": 0.0, "right": 0.0, "rear": 0.0 };
+def onDistance(msg, senderStamp, timeStamps):
+    if senderStamp == 0:
+        print("frontDistance=%f" % msg.distance)
+        distances["front"] = msg.distance
+    elif senderStamp == 1:
+        distances["left"] = msg.distance
+    elif senderStamp == 2:
+        distances["rear"] = msg.distance
+    elif senderStamp == 3:
+        distances["right"] = msg.distance
 
 def stop():
     print('stopping')
@@ -115,14 +126,20 @@ signal.signal(signal.SIGTERM, onSigterm)
 
 session = OD4Session.OD4Session(cid)
 session.registerMessageCallback(1500, onCones, messages.tme290_Cones)
+session.registerMessageCallback(1039, onDistance,
+        messages.opendlv_proxy_DistanceReading)
 atexit.register(stop)
 session.connect()
 
 while True:
-    # Stop the car if we haven't received any cone messages for a long time
-    if time.time() - lastConeMsg > 1:
+    # Stop the car if we haven't received any cone messages for a long time, we
+    # don't see any cones, or something is close in front
+    if time.time() - lastConeMsg > 1 or noCones or distances["front"] < stoppingDistance:
         pedalPosition = 0
         groundSteering = 0
+    else:
+        pedalPosition = velocity
+        groundSteering = steer * maxGroundSteering
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
