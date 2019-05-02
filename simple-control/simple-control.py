@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, time, atexit, signal
+import sys, time, atexit, signal, math
 import numpy as np
 import OD4Session
 import message_set_pb2 as messages
@@ -11,7 +11,8 @@ ySteering = 100
 
 velocity = 0.1 # constant car velocity
 maxGroundSteering = 0.1
-steeringOffset = 0.085
+minGroundSteering = 0.02
+steeringOffset = 0.07 # 0 is not straight ahead
 
 stoppingDistance = 0.1 # stop the car when front distance is less than this
 
@@ -82,7 +83,6 @@ def onCones(msg, senderStamp, timeStamps):
         # Stop the car if it can't see any cones
         noCones = True
         return
-    # TODO: reverse this if blue cones are on the right
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -140,7 +140,10 @@ while True:
         groundSteering = 0
     else:
         pedalPosition = velocity
-        groundSteering = -(min(2 * steer * maxGroundSteering, maxGroundSteering) + steeringOffset)
+        groundSteering = -(min(2.5 * steer * maxGroundSteering,
+            maxGroundSteering) + steeringOffset)
+        if abs(groundSteering) < minGroundSteering:
+            groundSteering = math.copysign(minGroundSteering, groundSteering)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
