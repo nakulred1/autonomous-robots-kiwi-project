@@ -9,12 +9,16 @@ import message_set_pb2 as messages
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-velocity = 0.1 # constant car velocity
+maxPedalPosition = 0.1
+pedalPositionThreshold = 0.05 # pedal position at which the car stops moving
+
 maxGroundSteering = 0.1
 minGroundSteering = 0.02
 steeringOffset = 0.07 # 0 is not straight ahead
 
-stoppingDistance = 0.1 # stop the car when front distance is less than this
+# limit the pedal position linearly from max to the threshold when
+# min < frontDistance < max
+throttleDistances = {"max": 0.3, "min": 0.1}
 
 cid = 112
 freq = 10
@@ -62,6 +66,22 @@ def distanceFromMiddle(pts, xMid, y):
     pts = np.array(pts)
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
+
+def calcPedalPosition():
+    if distances["front"] >= throttleDistances["max"]:
+        return maxPedalPosition
+    else:
+        return (maxPedalPosition -
+            (maxPedalPosition - pedalPositionThreshold) *
+            ((throttleDistances["max"] - distances["front"]) /
+             (throttleDistances["max"] - throttleDistances["min"])))
+
+def calcGroundSteering():
+    groundSteering = -(min(2.5 * steer * maxGroundSteering, maxGroundSteering) +
+            steeringOffset)
+    if abs(groundSteering) < minGroundSteering:
+        groundSteering = math.copysign(minGroundSteering, groundSteering)
+    return groundSteering
 
 
 lastConeMsg = time.time()
@@ -133,17 +153,14 @@ atexit.register(stop)
 session.connect()
 
 while True:
-    # Stop the car if we haven't received any cone messages for a long time, we
-    # don't see any cones, or something is close in front
-    if time.time() - lastConeMsg > 1 or noCones or distances["front"] < stoppingDistance:
+    # Stop the car if we haven't received any cone messages for a long time or
+    # we don't see any cones
+    if time.time() - lastConeMsg > 1 or noCones:
         pedalPosition = 0
         groundSteering = 0
     else:
-        pedalPosition = velocity
-        groundSteering = -(min(2.5 * steer * maxGroundSteering,
-            maxGroundSteering) + steeringOffset)
-        if abs(groundSteering) < minGroundSteering:
-            groundSteering = math.copysign(minGroundSteering, groundSteering)
+        pedalPosition = calcPedalPosition()
+        groundSteering = calcGroundSteering()
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
