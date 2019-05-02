@@ -20,6 +20,8 @@ steeringOffset = 0.07 # 0 is not straight ahead
 # min < frontDistance < max
 throttleDistances = {"max": 0.3, "min": 0.1}
 
+msgTimeout = 0.5 # stop if no cone messages have been received for this long
+
 cid = 112
 freq = 10
 
@@ -85,11 +87,9 @@ def calcGroundSteering():
 
 
 lastConeMsg = time.time()
-noCones = False
 steer = 0
 def onCones(msg, senderStamp, timeStamps):
     global lastConeMsg
-    global noCones
     global steer
 
     xSize = msg.xSize
@@ -99,10 +99,8 @@ def onCones(msg, senderStamp, timeStamps):
     ylwCones = np.frombuffer(msg.yellowCones, dtype='uint16').reshape(-1, 2)
     ylwCones = [tuple(pt) for pt in ylwCones.tolist()]
 
-    if len(bluCones) == 0 and len(ylwCones) == 0:
-        # Stop the car if it can't see any cones
-        noCones = True
-        return
+    # Treat a message with no cones as no message at all
+    if len(bluCones) == 0 and len(ylwCones) == 0: return
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -114,7 +112,6 @@ def onCones(msg, senderStamp, timeStamps):
     dx = distanceFromMiddle(midPts, xMid, ySteering)
 
     lastConeMsg = time.time()
-    noCones = False
     steer = dx / (xSize / 2)
     groundSteering = steer * maxGroundSteering
     print('steer=%f' % steer)
@@ -155,7 +152,7 @@ session.connect()
 while True:
     # Stop the car if we haven't received any cone messages for a long time or
     # we don't see any cones
-    if time.time() - lastConeMsg > 1 or noCones:
+    if time.time() - lastConeMsg > msgTimeout:
         pedalPosition = 0
         groundSteering = 0
     else:
