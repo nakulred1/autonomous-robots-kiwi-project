@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, time, atexit, signal
+import sys, time, atexit, signal, math
 import numpy as np
 import OD4Session
 import message_set_pb2 as messages
@@ -9,11 +9,18 @@ import message_set_pb2 as messages
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-velocity = 0.1 # constant car velocity
-maxGroundSteering = 0.1
-steeringOffset = 0.085
+maxPedalPosition = 0.1
+pedalPositionThreshold = 0.05 # pedal position at which the car stops moving
 
-stoppingDistance = 0.1 # stop the car when front distance is less than this
+maxGroundSteering = 0.1
+minGroundSteering = 0.02
+steeringOffset = 0.07 # 0 is not straight ahead
+
+# limit the pedal position linearly from max to the threshold when
+# min < frontDistance < max
+throttleDistances = {"max": 0.3, "min": 0.1}
+
+msgTimeout = 0.5 # stop if no cone messages have been received for this long
 
 cid = 112
 freq = 10
@@ -62,13 +69,27 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
 
+def calcPedalPosition():
+    if distances["front"] >= throttleDistances["max"]:
+        return maxPedalPosition
+    else:
+        return (maxPedalPosition -
+            (maxPedalPosition - pedalPositionThreshold) *
+            ((throttleDistances["max"] - distances["front"]) /
+             (throttleDistances["max"] - throttleDistances["min"])))
+
+def calcGroundSteering():
+    groundSteering = -(min(2.5 * steer * maxGroundSteering, maxGroundSteering) +
+            steeringOffset)
+    if abs(groundSteering) < minGroundSteering:
+        groundSteering = math.copysign(minGroundSteering, groundSteering)
+    return groundSteering
+
 
 lastConeMsg = time.time()
-noCones = False
 steer = 0
 def onCones(msg, senderStamp, timeStamps):
     global lastConeMsg
-    global noCones
     global steer
 
     xSize = msg.xSize
@@ -78,11 +99,8 @@ def onCones(msg, senderStamp, timeStamps):
     ylwCones = np.frombuffer(msg.yellowCones, dtype='uint16').reshape(-1, 2)
     ylwCones = [tuple(pt) for pt in ylwCones.tolist()]
 
-    if len(bluCones) == 0 and len(ylwCones) == 0:
-        # Stop the car if it can't see any cones
-        noCones = True
-        return
-    # TODO: reverse this if blue cones are on the right
+    # Treat a message with no cones as no message at all
+    if len(bluCones) == 0 and len(ylwCones) == 0: return
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -94,7 +112,6 @@ def onCones(msg, senderStamp, timeStamps):
     dx = distanceFromMiddle(midPts, xMid, ySteering)
 
     lastConeMsg = time.time()
-    noCones = False
     steer = dx / (xSize / 2)
     groundSteering = steer * maxGroundSteering
     print('steer=%f' % steer)
@@ -133,14 +150,14 @@ atexit.register(stop)
 session.connect()
 
 while True:
-    # Stop the car if we haven't received any cone messages for a long time, we
-    # don't see any cones, or something is close in front
-    if time.time() - lastConeMsg > 1 or noCones or distances["front"] < stoppingDistance:
+    # Stop the car if we haven't received any cone messages for a long time or
+    # we don't see any cones
+    if time.time() - lastConeMsg > msgTimeout:
         pedalPosition = 0
         groundSteering = 0
     else:
-        pedalPosition = velocity
-        groundSteering = -(min(2 * steer * maxGroundSteering, maxGroundSteering) + steeringOffset)
+        pedalPosition = calcPedalPosition()
+        groundSteering = calcGroundSteering()
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
