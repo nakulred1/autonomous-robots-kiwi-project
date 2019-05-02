@@ -9,10 +9,11 @@ import message_set_pb2 as messages
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-velocity = 0.05 # constant car velocity
-maxGroundSteering = 0.2
+velocity = 0.1 # constant car velocity
+maxGroundSteering = 0.1
+steeringOffset = 0.085
 
-stoppingDistance = 0.5 # stop the car when front distance is less than this
+stoppingDistance = 0.1 # stop the car when front distance is less than this
 
 cid = 112
 freq = 10
@@ -82,8 +83,8 @@ def onCones(msg, senderStamp, timeStamps):
         noCones = True
         return
     # TODO: reverse this if blue cones are on the right
-    if len(bluCones) == 0: bluCones = [(0, 0)]
-    if len(ylwCones) == 0: ylwCones = [(xSize-1, 0)]
+    if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
+    if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
     bluPts = addPoints(bluCones, xSize, ySize)
     ylwPts = addPoints(ylwCones, xSize, ySize)
@@ -139,7 +140,7 @@ while True:
         groundSteering = 0
     else:
         pedalPosition = velocity
-        groundSteering = steer * maxGroundSteering
+        groundSteering = -(min(2 * steer * maxGroundSteering, maxGroundSteering) + steeringOffset)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
