@@ -14,7 +14,13 @@ def findCones(img, hsvLow, hsvHigh):
     erode = cv2.erode(cones, kernel, iterations=2)
     dilate = cv2.dilate(erode, kernel, iterations=2)
 
-    _, contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    try:
+        _, contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+    except ValueError:
+        contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+
     conePos = []
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
@@ -63,4 +69,5 @@ def calcMiddleLine(bluPts, ylwPts):
 def distanceFromMiddle(pts, xMid, y):
     pts = np.array(pts)
     x = np.interp(y, pts[:,1], pts[:,0])
+    if type(x) == np.float64: x = x.item()
     return round(x - xMid)
