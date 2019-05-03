@@ -67,5 +67,6 @@ def calcMiddleLine(bluPts, ylwPts):
 
 def distanceFromMiddle(pts, xMid, y):
     pts = np.array(pts)
-    x = np.interp(y, pts[:,1], pts[:,0]).item()
+    x = np.interp(y, pts[:,1], pts[:,0])
+    if type(x) == np.float64: x = x.item()
     return round(x - xMid)
