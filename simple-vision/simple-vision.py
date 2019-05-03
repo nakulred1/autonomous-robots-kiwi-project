@@ -15,6 +15,11 @@ bluHigh = (130, 255, 255)
 ylwLow = (23, 60, 100)
 ylwHigh = (28, 255, 255)
 
+
+#range for identifying orange cones in HSV
+orngLow = ()
+orngHigh = ()
+
 cid = 112
 
 
@@ -71,11 +76,13 @@ while True:
 
     bluCones = findCones(hsv, bluLow, bluHigh)
     ylwCones = findCones(hsv, ylwLow, ylwHigh)
-    print(bluCones, ylwCones)
+    orngCones = findCones(hsv, orngLow, orngHigh)
+    print(bluCones, ylwCones, orngCones)
 
     conesMsg = messages.tme290_Cones()
     conesMsg.xSize = img.shape[1]
     conesMsg.ySize = img.shape[0]
     conesMsg.blueCones = np.array(bluCones, dtype='uint16').tobytes()
     conesMsg.yellowCones = np.array(ylwCones, dtype='uint16').tobytes()
+    conesMsg.orangeCones = np.array(orngCones, dtype='uint16').tobytes()
     session.send(1500, conesMsg.SerializeToString())

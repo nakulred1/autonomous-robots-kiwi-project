@@ -98,6 +98,15 @@ def onCones(msg, senderStamp, timeStamps):
     bluCones = [tuple(pt) for pt in bluCones.tolist()]
     ylwCones = np.frombuffer(msg.yellowCones, dtype='uint16').reshape(-1, 2)
     ylwCones = [tuple(pt) for pt in ylwCones.tolist()]
+    orngCones = np.frombuffer(msg.orangeCones, dtype='uint16').reshape(-1, 2)
+    orngCones = [tuple(pt) for pt in orangeCones.tolist()]
+
+    #Added condition to stop the car if there is a orange cone. 
+    #TODO: to be verified
+    if len(orngCones) > 0
+	pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
+        pedalPositionRequest.position = 0.05
+        session.send(1086, pedalPositionRequest.SerializeToString())  
 
     # Treat a message with no cones as no message at all
     if len(bluCones) == 0 and len(ylwCones) == 0: return

@@ -8,7 +8,7 @@ import linefuncs as f
 # range for identifying blue cones in HSV
 bluLow = (95, 90, 20)
 bluHigh = (130, 255, 255)
-
+count = 0
 # range for identifying yellow cones in HSV
 ylwLow = (23, 60, 100)
 ylwHigh = (28, 255, 255)
@@ -68,5 +68,6 @@ while True:
     cv2.arrowedLine(img, (xMid, ySteering), (xMid + dx, ySteering), (0, 0, 255))
 
     cv2.imshow("img", img)
-    
+
+
     cv2.waitKey(1)
