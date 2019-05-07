@@ -12,16 +12,15 @@ import vision
 ySteering = 100
 
 maxPedalPosition = 0.16
-pedalPositionThreshold = 0.08 # pedal position at which the car stops moving
 
 maxGroundSteering = 0.08
 minGroundSteering = 0.01
 groundSteeringMultiplier = 2.5
 steeringOffset = 0.04 # 0 is not straight ahead
 
-# limit the pedal position linearly from max to the threshold when
-# min < frontDistance < max
-throttleDistances = {"max": 0, "min": 0}
+# limit the pedal position linearly from max to threshold (at which the car
+# stops moving) when min < frontDistance < max
+distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
 
 # limit the pedal position linearly from max to "pedalPosition" when
 # minSteer < steer < maxSteer
@@ -78,11 +77,11 @@ def distanceFromMiddle(pts, xMid, y):
 
 def calcPedalPosition(steer):
     distMaxPedalPosition = maxPedalPosition
-    if distances["front"] < throttleDistances["max"]:
+    if distances["front"] < distanceThrottle["max"]:
         distMaxPedalPosition = (maxPedalPosition -
-            (maxPedalPosition - pedalPositionThreshold) *
-            ((throttleDistances["max"] - distances["front"]) /
-             (throttleDistances["max"] - throttleDistances["min"])))
+            (maxPedalPosition - distanceThrottle["threshold"]) *
+            ((distanceThrottle["max"] - distances["front"]) /
+             (distanceThrottle["max"] - distanceThrottle["min"])))
         print('distanceThrottle:', distMaxPedalPosition)
 
     steerMaxPedalPosition = maxPedalPosition
