@@ -27,10 +27,10 @@ throttleDistances = {"max": 0, "min": 0}
 # minSteer < steer < maxSteer
 steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
 
-msgTimeout = 1 # stop if no cone messages have been received for this long
+lastSeen = 0
+timeout = 1 # stop if no cones have been seen for this long
 
 cid = 112
-freq = 10
 
 
 def addPoints(cones, w, h):
@@ -176,8 +176,16 @@ while True:
     bluCones, ylwCones, xSize, ySize = vision.findCones(buf)
     steer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
-    pedalPosition = calcPedalPosition(steer)
-    groundSteering = calcGroundSteering(steer)
+    if steer == None:
+        if time.time() - lastSeen < timeout:
+            continue
+        print('timeout')
+        pedalPosition = 0
+        groundSteering = steeringOffset
+    else:
+        lastSeen = time.time()
+        pedalPosition = calcPedalPosition(steer)
+        groundSteering = calcGroundSteering(steer)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
@@ -190,5 +198,3 @@ while True:
     pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
     pedalPositionRequest.position = pedalPosition
     session.send(1086, pedalPositionRequest.SerializeToString())
-
-    time.sleep(1/freq)
