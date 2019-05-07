@@ -9,18 +9,19 @@ import message_set_pb2 as messages
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-maxPedalPosition = 0.1
-pedalPositionThreshold = 0.05 # pedal position at which the car stops moving
+maxPedalPosition = 0.0
+pedalPositionThreshold = 0.08 # pedal position at which the car stops moving
 
-maxGroundSteering = 0.1
-minGroundSteering = 0.02
-steeringOffset = 0.07 # 0 is not straight ahead
+maxGroundSteering = 0.08
+minGroundSteering = 0.01
+groundSteeringMultiplier = 2.5
+steeringOffset = 0.04 # 0 is not straight ahead
 
 # limit the pedal position linearly from max to the threshold when
 # min < frontDistance < max
-throttleDistances = {"max": 0.3, "min": 0.1}
+throttleDistances = {"max": 0.5, "min": 0.1}
 
-msgTimeout = 0.5 # stop if no cone messages have been received for this long
+msgTimeout = 1 # stop if no cone messages have been received for this long
 
 cid = 112
 freq = 10
@@ -73,13 +74,14 @@ def calcPedalPosition():
     if distances["front"] >= throttleDistances["max"]:
         return maxPedalPosition
     else:
+        print('frontDistance < 0.3')
         return (maxPedalPosition -
             (maxPedalPosition - pedalPositionThreshold) *
             ((throttleDistances["max"] - distances["front"]) /
              (throttleDistances["max"] - throttleDistances["min"])))
 
 def calcGroundSteering():
-    groundSteering = -(min(2.5 * steer * maxGroundSteering, maxGroundSteering) +
+    groundSteering = -(min(groundSteeringMultiplier * steer * maxGroundSteering, maxGroundSteering) +
             steeringOffset)
     if abs(groundSteering) < minGroundSteering:
         groundSteering = math.copysign(minGroundSteering, groundSteering)
@@ -88,9 +90,11 @@ def calcGroundSteering():
 
 lastConeMsg = time.time()
 steer = 0
+numMsgs = 0
 def onCones(msg, senderStamp, timeStamps):
     global lastConeMsg
     global steer
+    global numMsgs
 
     xSize = msg.xSize
     ySize = msg.ySize
@@ -153,11 +157,13 @@ while True:
     # Stop the car if we haven't received any cone messages for a long time or
     # we don't see any cones
     if time.time() - lastConeMsg > msgTimeout:
+        print('timeout:', numMsgs)
         pedalPosition = 0
-        groundSteering = 0
+        groundSteering =0
     else:
         pedalPosition = calcPedalPosition()
         groundSteering = calcGroundSteering()
+    print(pedalPosition)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
