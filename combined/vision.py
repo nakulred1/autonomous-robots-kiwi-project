@@ -47,5 +47,4 @@ def findCones(buf):
 
     bluCones = _findConesInImg(hsv, bluRanges)
     ylwCones = _findConesInImg(hsv, ylwRanges)
-    print(bluCones, ylwCones)
     return bluCones, ylwCones, img.shape[1], img.shape[0]

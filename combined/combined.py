@@ -11,7 +11,7 @@ import vision
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-maxPedalPosition = 0.0
+maxPedalPosition = 0.16
 pedalPositionThreshold = 0.08 # pedal position at which the car stops moving
 
 maxGroundSteering = 0.08
@@ -21,7 +21,11 @@ steeringOffset = 0.04 # 0 is not straight ahead
 
 # limit the pedal position linearly from max to the threshold when
 # min < frontDistance < max
-throttleDistances = {"max": 0.5, "min": 0.1}
+throttleDistances = {"max": 0, "min": 0}
+
+# limit the pedal position linearly from max to "pedalPosition" when
+# minSteer < steer < maxSteer
+steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
 
 msgTimeout = 1 # stop if no cone messages have been received for this long
 
@@ -72,17 +76,30 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
 
-def calcPedalPosition():
-    if distances["front"] >= throttleDistances["max"]:
-        return maxPedalPosition
-    else:
-        print('frontDistance < 0.3')
-        return (maxPedalPosition -
+def calcPedalPosition(steer):
+    distMaxPedalPosition = maxPedalPosition
+    if distances["front"] < throttleDistances["max"]:
+        distMaxPedalPosition = (maxPedalPosition -
             (maxPedalPosition - pedalPositionThreshold) *
             ((throttleDistances["max"] - distances["front"]) /
              (throttleDistances["max"] - throttleDistances["min"])))
+        print('distanceThrottle:', distMaxPedalPosition)
 
-def calcGroundSteering():
+    steerMaxPedalPosition = maxPedalPosition
+    steer = abs(steer) # don't care about the sign in this function
+    if steer > steerThrottle["minSteer"]:
+        if steer >= steerThrottle["maxSteer"]:
+            steerMaxPedalPosition = steerThrottle["pedalPosition"]
+        else:
+            steerPedalPosition = (maxPedalPosition -
+                (maxPedalPosition - steerThrottle["pedalPosition"]) *
+                ((steer - steerThrottle["minSteer"]) /
+                 (steerThrottle["maxSteer"] - steerThrottle["minSteer"])))
+        print('steerThrottle:', steerPedalPosition)
+
+    return min(distMaxPedalPosition, steerMaxPedalPosition)
+
+def calcGroundSteering(steer):
     groundSteering = -(min(groundSteeringMultiplier * steer * maxGroundSteering, maxGroundSteering) +
             steeringOffset)
     if abs(groundSteering) < minGroundSteering:
@@ -111,7 +128,6 @@ def calcSteer(bluCones, ylwCones, xSize, ySize):
 distances = { "front": 0.0, "left": 0.0, "right": 0.0, "rear": 0.0 };
 def onDistance(msg, senderStamp, timeStamps):
     if senderStamp == 0:
-        print("frontDistance=%f" % msg.distance)
         distances["front"] = msg.distance
     elif senderStamp == 1:
         distances["left"] = msg.distance
@@ -160,9 +176,8 @@ while True:
     bluCones, ylwCones, xSize, ySize = vision.findCones(buf)
     steer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
-    pedalPosition = calcPedalPosition()
-    groundSteering = calcGroundSteering()
-    print(pedalPosition)
+    pedalPosition = calcPedalPosition(steer)
+    groundSteering = calcGroundSteering(steer)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
