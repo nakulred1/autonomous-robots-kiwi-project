@@ -4,16 +4,23 @@ import numpy as np
 import cv2
 
 # range for identifying blue cones in HSV
-bluLow = (95, 90, 20)
-bluHigh = (130, 255, 255)
+bluRanges = [
+    [(97, 78, 35), (130, 255, 100)], # regular cone blue
+    [(112, 30, 30), (150, 80, 70)]  # more of a dark gray
+]
 
 # range for identifying yellow cones in HSV
-ylwLow = (23, 60, 100)
-ylwHigh = (28, 255, 255)
+ylwRanges = [
+    [(23, 60, 140), (32, 255, 255)]
+]
 
 
 def _findConesInImg(img, hsvLow, hsvHigh):
-    cones = cv2.inRange(img, hsvLow, hsvHigh)
+    cones = None
+    for i in range(len(hsvRanges)):
+        inRange = cv2.inRange(img, hsvRanges[i][0], hsvRanges[i][1])
+        if i == 0: cones = inRange
+        else:      cones = cv2.bitwise_or(cones, inRange)
 
     kernel = np.ones((3, 3), np.uint8)
     erode = cv2.erode(cones, kernel, iterations=2)
