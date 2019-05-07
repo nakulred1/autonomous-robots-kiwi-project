@@ -9,7 +9,6 @@ import linefuncs as f
 bluRanges = [
     [(97, 78, 35), (130, 255, 100)], # regular cone blue
     [(112, 30, 30), (150, 80, 70)]  # more of a dark gray
-#    [(115, 15, 40), (150, 80, 100)]  # more of a dark gray
 ]
 
 # range for identifying yellow cones in HSV
