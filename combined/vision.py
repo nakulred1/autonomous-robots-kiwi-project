@@ -15,7 +15,7 @@ ylwRanges = [
 ]
 
 
-def _findConesInImg(img, hsvLow, hsvHigh):
+def _findConesInImg(img, hsvRanges):
     cones = None
     for i in range(len(hsvRanges)):
         inRange = cv2.inRange(img, hsvRanges[i][0], hsvRanges[i][1])
@@ -45,7 +45,7 @@ def findCones(buf):
         (640, 280), (0, 280))).astype(np.int32)
     cv2.fillPoly(hsv, [pts], (0, 0, 0)) # black out the car
 
-    bluCones = _findConesInImg(hsv, bluLow, bluHigh)
-    ylwCones = _findConesInImg(hsv, ylwLow, ylwHigh)
+    bluCones = _findConesInImg(hsv, bluRanges)
+    ylwCones = _findConesInImg(hsv, ylwRanges)
     print(bluCones, ylwCones)
     return bluCones, ylwCones, img.shape[1], img.shape[0]
