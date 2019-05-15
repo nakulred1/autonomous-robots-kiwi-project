@@ -34,6 +34,7 @@ while True:
     mutex.release()
 
     img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
+    img1 = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
     img = img[200:480, 0:640]  # remove the top of the image
 
     blur = cv2.GaussianBlur(img, (5, 5), 0)
@@ -80,9 +81,9 @@ while True:
                           10)
         return face_img
 
-    img = detect_face(img)
+    img1 = detect_face(img1)
 
-    cv2.imshow("img", img)
+    cv2.imshow("img", img1)
 
     k = cv2.waitKey(1)
     if k == 27:
