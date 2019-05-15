@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import cv2
 
@@ -48,13 +50,16 @@ pts = np.array(((0, 280), (0, 170), (200, 130), (420, 135), (640, 190),
 cv2.fillPoly(hsv, [pts], (0, 0, 0))
 
 # set verbose to True for the cones you want to see
-blueCones = findCones(hsv, [[(97, 80, 35), (130, 255, 100)],
-        [(115, 30, 30), (150, 80, 70)]], verbose=True)
+blueCones = findCones(hsv, [[(97, 78, 35), (130, 255, 100)],
+        [(112, 30, 30), (150, 80, 70)]], verbose=False)
 yellowCones = findCones(hsv, [[(23, 60, 140), (32, 255, 255)]], verbose=False)
+orangeCones = findCones(hsv, [[(0, 80, 110), (8, 180, 200)]], verbose=True)
 for cone in blueCones:
     cross(img, cone[0], cone[1], (255, 0, 0))
 for cone in yellowCones:
     cross(img, cone[0], cone[1], (0, 255, 255))
+for cone in orangeCones:
+    cross(img, cone[0], cone[1], (0, 140, 255))
 
 cv2.imshow("img", img)
 cv2.moveWindow("img", 0, 0)

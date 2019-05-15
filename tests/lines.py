@@ -16,6 +16,10 @@ ylwRanges = [
     [(23, 60, 140), (32, 255, 255)]
 ]
 
+orgRanges = [
+    [(0, 80, 110), (8, 180, 200)]
+]
+
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
@@ -48,10 +52,13 @@ while True:
 
     bluCones = f.findCones(hsv, bluRanges)
     ylwCones = f.findCones(hsv, ylwRanges)
+    orgCones = f.findCones(hsv, orgRanges)
     for cone in bluCones:
         f.cross(img, cone, (255, 0, 0))
     for cone in ylwCones:
         f.cross(img, cone, (0, 255, 255))
+    for cone in orgCones:
+        f.cross(img, cone, (0, 140, 255))
 
     if len(bluCones) == 0: bluCones = [(img.shape[1]-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
