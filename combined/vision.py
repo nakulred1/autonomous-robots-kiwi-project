@@ -19,7 +19,7 @@ orgRanges = [
     [(0, 80, 110), (8, 180, 200)]
 ]
 
-orgMinArea = 0 # only detect cones that are larger (closer) than this
+minOrgArea = 0 # only detect cones that are larger (closer) than this
 
 
 def _findConesInImg(img, hsvRanges, minArea=0):
@@ -56,4 +56,4 @@ def findCones(buf):
     bluCones = _findConesInImg(hsv, bluRanges)
     ylwCones = _findConesInImg(hsv, ylwRanges)
     orgCones = _findConesInImg(hsv, orgRanges, minArea=minOrgArea)
-    return bluCones, ylwCones, img.shape[1], img.shape[0]
+    return bluCones, ylwCones, orgCones, img.shape[1], img.shape[0]

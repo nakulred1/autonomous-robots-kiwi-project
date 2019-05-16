@@ -25,10 +25,17 @@ distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
 # limit the pedal position linearly from max to "pedalPosition" when
 # minSteer < steer < maxSteer
 #steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
-steerThrottle = {"minSteer": 0, "maxSteer": 0, "pedalPosition": 0.14}
+steerThrottle = {"minSteer": 1, "maxSteer": 1, "pedalPosition": 0.14}
 
 lastSeen = 0
 timeout = 1 # stop if no cones have been seen for this long
+
+state = "drive"
+
+# used by the waitAtIntersection state
+lastMotion = None
+waitTimeout = 2
+
 
 cid = 112
 
@@ -162,7 +169,7 @@ def stop():
         pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
         pedalPositionRequest.position = 0
         session.send(1086, pedalPositionRequest.SerializeToString())
-        time.sleep(1/freq)
+        time.sleep(0.1)
 
 def onSigterm():
     sys.exit(0)
@@ -197,16 +204,39 @@ while True:
 
     steer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
-    if steer == None:
-        if time.time() - lastSeen < timeout:
-            continue
-        print('timeout')
+    if state == "drive":
+        if steer == None:
+            if time.time() - lastSeen < timeout:
+                continue
+            print('timeout')
+            pedalPosition = 0
+            groundSteering = steeringOffset
+        else:
+            lastSeen = time.time()
+            pedalPosition = calcPedalPosition(steer)
+            groundSteering = calcGroundSteering(steer)
+
+        if len(orgCones) > 0:
+            lastMotion = time.time()
+            print('drive -> waitAtIntersection')
+            state = "waitAtIntersection"
+
+    if state == "waitAtIntersection":
         pedalPosition = 0
         groundSteering = steeringOffset
-    else:
-        lastSeen = time.time()
+
+        # TODO: check for motion
+        if time.time() - lastMotion > waitTimeout:
+            print('waitAtIntersection -> continueAfterIntersection')
+            state = "continueAfterIntersection"
+
+    if state == "continueAfterIntersection":
         pedalPosition = calcPedalPosition(steer)
-        groundSteering = calcGroundSteering(steer)
+        groundSteering - calcGroundSteering(steer)
+
+        if len(orgCones) == 0:
+            print('continueAfterIntersection -> drive')
+            state = "drive"
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
