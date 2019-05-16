@@ -25,7 +25,7 @@ while True:
     mutex.release()
 
     img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
-    img = img[200:380, 0:640] # remove the top and bottom of the image
+    img = img[200:380, 140:640] # remove the top, bottom and left parts of the image
 
     blur = cv2.GaussianBlur(img, (5, 5), 0)
     motion = fgbg.apply(blur)

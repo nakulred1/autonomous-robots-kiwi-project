@@ -43,8 +43,7 @@ def _findConesInImg(img, hsvRanges, minArea=0):
     conePos.sort(key=lambda pt: pt[1])
     return conePos
 
-def findCones(buf):
-    img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
+def findCones(img):
     img = img[200:480, 0:640] # remove the top of the image
 
     blur = cv2.GaussianBlur(img, (5, 5), 0)

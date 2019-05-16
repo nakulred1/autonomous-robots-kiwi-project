@@ -5,7 +5,7 @@ import numpy as np
 import OD4Session
 import message_set_pb2 as messages
 
-import vision
+import vision, motion
 
 
 # y-coordinate of line to check for steering direction
@@ -198,7 +198,9 @@ while True:
     shm.detach()
     mutex.release()
 
-    bluCones, ylwCones, orgCones, xSize, ySize = vision.findCones(buf)
+    img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
+
+    bluCones, ylwCones, orgCones, xSize, ySize = vision.findCones(img)
     if len(orgCones) > 2:
         classifyOrgCones(orgCones, bluCones, ylwCones)
 
@@ -225,7 +227,9 @@ while True:
         pedalPosition = 0
         groundSteering = steeringOffset
 
-        # TODO: check for motion
+        if motion.checkForMotion(img):
+            lastMotion = time.time()
+
         if time.time() - lastMotion > waitTimeout:
             print('waitAtIntersection -> continueAfterIntersection')
             state = "continueAfterIntersection"
