@@ -60,6 +60,9 @@ while True:
     for cone in orgCones:
         f.cross(img, cone, (0, 140, 255))
 
+    if len(orgCones) > 0:
+        f.classifyOrgCones(orgCones, bluCones, ylwCones)
+
     if len(bluCones) == 0: bluCones = [(img.shape[1]-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 

@@ -24,7 +24,8 @@ distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
 
 # limit the pedal position linearly from max to "pedalPosition" when
 # minSteer < steer < maxSteer
-steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
+#steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
+steerThrottle = {"minSteer": 0, "maxSteer": 0, "pedalPosition": 0.14}
 
 lastSeen = 0
 timeout = 1 # stop if no cones have been seen for this long
@@ -75,6 +76,26 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
 
+minOrgConesDx = 10
+def classifyOrgCones(orgCones, bluCones, ylwCones):
+    # assume that the largest "hole" in the x-direction between orange cones
+    # is the lane and add cones to the left to the yellow cones and cones to
+    # the right to the blue
+    orgCones.sort(key=lambda pt: pt[0])
+    maxDx = 0
+    iMaxDx = 0
+    for i in range(1, len(orgCones)):
+        dx = orgCones[i][0] - orgCones[i-1][0]
+        if dx > maxDx:
+            maxDx = dx
+            iMaxDx = i
+
+    if maxDx > minOrgConesDx:
+        bluCones.extend(orgCones[iMaxDx:])
+        bluCones.sort(key=lambda pt: pt[1])
+        ylwCones.extend(orgCones[0:iMaxDx])
+        ylwCones.sort(key=lambda pt: pt[1])
+
 def calcPedalPosition(steer):
     distMaxPedalPosition = maxPedalPosition
     if distances["front"] < distanceThrottle["max"]:
@@ -90,11 +111,11 @@ def calcPedalPosition(steer):
         if steer >= steerThrottle["maxSteer"]:
             steerMaxPedalPosition = steerThrottle["pedalPosition"]
         else:
-            steerPedalPosition = (maxPedalPosition -
+            steerMaxPedalPosition = (maxPedalPosition -
                 (maxPedalPosition - steerThrottle["pedalPosition"]) *
                 ((steer - steerThrottle["minSteer"]) /
                  (steerThrottle["maxSteer"] - steerThrottle["minSteer"])))
-        print('steerThrottle:', steerPedalPosition)
+        print('steerThrottle:', steerMaxPedalPosition)
 
     return min(distMaxPedalPosition, steerMaxPedalPosition)
 
@@ -106,7 +127,6 @@ def calcGroundSteering(steer):
     return groundSteering
 
 def calcSteer(bluCones, ylwCones, xSize, ySize):
-    # Treat a message with no cones as no message at all
     if len(bluCones) == 0 and len(ylwCones) == 0: return
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
@@ -119,7 +139,6 @@ def calcSteer(bluCones, ylwCones, xSize, ySize):
     dx = distanceFromMiddle(midPts, xMid, ySteering)
 
     steer = dx / (xSize / 2)
-    groundSteering = steer * maxGroundSteering
     print('steer=%f' % steer)
     return steer
 
@@ -172,7 +191,10 @@ while True:
     shm.detach()
     mutex.release()
 
-    bluCones, ylwCones, xSize, ySize = vision.findCones(buf)
+    bluCones, ylwCones, orgCones, xSize, ySize = vision.findCones(buf)
+    if len(orgCones) > 2:
+        classifyOrgCones(orgCones, bluCones, ylwCones)
+
     steer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
     if steer == None:

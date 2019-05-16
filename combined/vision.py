@@ -14,8 +14,15 @@ ylwRanges = [
     [(23, 60, 140), (32, 255, 255)]
 ]
 
+# range for identifying orange cones in HSV
+orgRanges = [
+    [(0, 80, 110), (8, 180, 200)]
+]
 
-def _findConesInImg(img, hsvRanges):
+orgMinArea = 0 # only detect cones that are larger (closer) than this
+
+
+def _findConesInImg(img, hsvRanges, minArea=0):
     cones = None
     for i in range(len(hsvRanges)):
         inRange = cv2.inRange(img, hsvRanges[i][0], hsvRanges[i][1])
@@ -31,7 +38,8 @@ def _findConesInImg(img, hsvRanges):
     conePos = []
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
-        conePos.append((x + int(w/2), y + h))
+        if w*h > minArea:
+            conePos.append((x + int(w/2), y + h))
     conePos.sort(key=lambda pt: pt[1])
     return conePos
 
@@ -47,4 +55,5 @@ def findCones(buf):
 
     bluCones = _findConesInImg(hsv, bluRanges)
     ylwCones = _findConesInImg(hsv, ylwRanges)
+    orgCones = _findConesInImg(hsv, orgRanges, minArea=minOrgArea)
     return bluCones, ylwCones, img.shape[1], img.shape[0]
