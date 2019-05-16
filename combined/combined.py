@@ -35,6 +35,7 @@ state = "drive"
 # used by the waitAtIntersection state
 lastMotion = None
 waitTimeout = 2
+trafficFromRight = True # has to be changed depending on where the car starts
 
 
 cid = 112
@@ -219,9 +220,13 @@ while True:
             groundSteering = calcGroundSteering(steer)
 
         if len(orgCones) > 0:
-            lastMotion = time.time()
-            print('drive -> waitAtIntersection')
-            state = "waitAtIntersection"
+            if trafficFromRight:
+                lastMotion = time.time()
+                print('drive -> waitAtIntersection')
+                state = "waitAtIntersection"
+            else:
+                print('drive -> continueAfterIntersection')
+                state = "continueAfterIntersection"
 
     if state == "waitAtIntersection":
         pedalPosition = 0
@@ -239,6 +244,9 @@ while True:
         groundSteering - calcGroundSteering(steer)
 
         if len(orgCones) == 0:
+            # next intersection will be the reverse from this one
+            trafficFromRight = !trafficFromRight
+
             print('continueAfterIntersection -> drive')
             state = "drive"
 
