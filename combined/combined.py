@@ -16,6 +16,7 @@ maxPedalPosition = 0.16
 maxGroundSteering = 0.08
 minGroundSteering = 0.01
 groundSteeringMultiplier = 2.5
+groundSteeringDMultiplier = 0.0
 steeringOffset = 0.04 # 0 is not straight ahead
 
 # limit the pedal position linearly from max to threshold (at which the car
@@ -104,7 +105,7 @@ def classifyOrgCones(orgCones, bluCones, ylwCones):
         ylwCones.extend(orgCones[0:iMaxDx])
         ylwCones.sort(key=lambda pt: pt[1])
 
-def calcPedalPosition(steer):
+def calcPedalPosition(steer, dSteer):
     distMaxPedalPosition = maxPedalPosition
     if distances["front"] < distanceThrottle["max"]:
         distMaxPedalPosition = (maxPedalPosition -
@@ -127,15 +128,22 @@ def calcPedalPosition(steer):
 
     return min(distMaxPedalPosition, steerMaxPedalPosition)
 
-def calcGroundSteering(steer):
-    groundSteering = -(min(groundSteeringMultiplier * steer * maxGroundSteering, maxGroundSteering) +
-            steeringOffset)
+def calcGroundSteering(steer, dSteer):
+    P = groundSteeringMultiplier * steer
+    D = groundSteeringDMultiplier * dSteer
+    groundSteering = -(min(P + D, 1) * maxGroundSteering + steeringOffset)
     if abs(groundSteering) < minGroundSteering:
         groundSteering = math.copysign(minGroundSteering, groundSteering)
     return groundSteering
 
+
+prevSteer = 0
+prevSteerTime = time.time()
 def calcSteer(bluCones, ylwCones, xSize, ySize):
-    if len(bluCones) == 0 and len(ylwCones) == 0: return
+    global prevSteer
+    global prevSteerTime
+
+    if len(bluCones) == 0 and len(ylwCones) == 0: return None, None
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -147,8 +155,11 @@ def calcSteer(bluCones, ylwCones, xSize, ySize):
     dx = distanceFromMiddle(midPts, xMid, ySteering)
 
     steer = dx / (xSize / 2)
-    print('steer=%f' % steer)
-    return steer
+    dSteer = (steer - prevSteer) / (time.time() - prevSteerTime)
+    prevSteer = steer
+    prevSteerTime = time.time()
+    print('steer=%f dSteer=%f' % (steer, dSteer))
+    return steer, dSteer
 
 
 distances = { "front": 0.0, "left": 0.0, "right": 0.0, "rear": 0.0 };
@@ -205,7 +216,7 @@ while True:
     if len(orgCones) > 2:
         classifyOrgCones(orgCones, bluCones, ylwCones)
 
-    steer = calcSteer(bluCones, ylwCones, xSize, ySize)
+    steer, dSteer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
     if state == "drive":
         if steer == None:
@@ -216,8 +227,8 @@ while True:
             groundSteering = steeringOffset
         else:
             lastSeen = time.time()
-            pedalPosition = calcPedalPosition(steer)
-            groundSteering = calcGroundSteering(steer)
+            pedalPosition = calcPedalPosition(steer, dSteer)
+            groundSteering = calcGroundSteering(steer, dSteer)
 
         if len(orgCones) > 0:
             if trafficFromRight:
@@ -240,12 +251,12 @@ while True:
             state = "continueAfterIntersection"
 
     if state == "continueAfterIntersection":
-        pedalPosition = calcPedalPosition(steer)
-        groundSteering - calcGroundSteering(steer)
+        pedalPosition = calcPedalPosition(steer, dSteer)
+        groundSteering - calcGroundSteering(steer, dSteer)
 
         if len(orgCones) == 0:
             # next intersection will be the reverse from this one
-            trafficFromRight = !trafficFromRight
+            trafficFromRight = not trafficFromRight
 
             print('continueAfterIntersection -> drive')
             state = "drive"
