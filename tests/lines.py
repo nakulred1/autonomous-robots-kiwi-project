@@ -6,12 +6,19 @@ import cv2
 import linefuncs as f
 
 # range for identifying blue cones in HSV
-bluLow = (95, 90, 20)
-bluHigh = (130, 255, 255)
+bluRanges = [
+    [(97, 78, 35), (130, 255, 100)], # regular cone blue
+    [(112, 30, 30), (150, 80, 70)]  # more of a dark gray
+]
 
 # range for identifying yellow cones in HSV
-ylwLow = (23, 60, 100)
-ylwHigh = (28, 255, 255)
+ylwRanges = [
+    [(23, 60, 140), (32, 255, 255)]
+]
+
+orgRanges = [
+    [(0, 80, 110), (8, 180, 200)]
+]
 
 # y-coordinate of line to check for steering direction
 ySteering = 100
@@ -43,15 +50,21 @@ while True:
         (640, 280), (0, 280))).astype(np.int32)
     cv2.fillPoly(hsv, [pts], (0, 0, 0)) # black out the car
 
-    bluCones = f.findCones(hsv, bluLow, bluHigh)
-    ylwCones = f.findCones(hsv, ylwLow, ylwHigh)
+    bluCones = f.findCones(hsv, bluRanges)
+    ylwCones = f.findCones(hsv, ylwRanges)
+    orgCones = f.findCones(hsv, orgRanges)
     for cone in bluCones:
         f.cross(img, cone, (255, 0, 0))
     for cone in ylwCones:
         f.cross(img, cone, (0, 255, 255))
+    for cone in orgCones:
+        f.cross(img, cone, (0, 140, 255))
 
-    if len(bluCones) == 0: bluCones = [(0, 0)]
-    if len(ylwCones) == 0: ylwCones = [(img.shape[1]-1, 0)]
+    if len(orgCones) > 0:
+        f.classifyOrgCones(orgCones, bluCones, ylwCones)
+
+    if len(bluCones) == 0: bluCones = [(img.shape[1]-1, 0)]
+    if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
     bluPts = f.addPoints(bluCones, img.shape[1], img.shape[0])
     ylwPts = f.addPoints(ylwCones, img.shape[1], img.shape[0])

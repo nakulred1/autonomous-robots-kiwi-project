@@ -7,8 +7,12 @@ def cross(img, pt, color):
     cv2.line(img, (pt[0]-5,pt[1]+5), (pt[0]+5,pt[1]-5), color)
     cv2.line(img, (pt[0]+5,pt[1]+5), (pt[0]-5,pt[1]-5), color)
 
-def findCones(img, hsvLow, hsvHigh):
-    cones = cv2.inRange(img, hsvLow, hsvHigh)
+def findCones(img, hsvRanges):
+    cones = None
+    for i in range(len(hsvRanges)):
+        inRange = cv2.inRange(img, hsvRanges[i][0], hsvRanges[i][1])
+        if i == 0: cones = inRange
+        else:      cones = cv2.bitwise_or(cones, inRange)
 
     kernel = np.ones((3, 3), np.uint8)
     erode = cv2.erode(cones, kernel, iterations=2)
@@ -71,3 +75,23 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     if type(x) == np.float64: x = x.item()
     return round(x - xMid)
+
+minOrgConesDx = 10
+def classifyOrgCones(orgCones, bluCones, ylwCones):
+    # assume that the largest "hole" in the x-direction between orange cones
+    # is the lane and add cones to the left to the yellow cones and cones to
+    # the right to the blue
+    orgCones.sort(key=lambda pt: pt[0])
+    maxDx = 0
+    iMaxDx = 0
+    for i in range(1, len(orgCones)):
+        dx = orgCones[i][0] - orgCones[i-1][0]
+        if dx > maxDx:
+            maxDx = dx
+            iMaxDx = i
+
+    if maxDx > minOrgConesDx:
+        bluCones.extend(orgCones[iMaxDx:])
+        bluCones.sort(key=lambda pt: pt[1])
+        ylwCones.extend(orgCones[0:iMaxDx])
+        ylwCones.sort(key=lambda pt: pt[1])
