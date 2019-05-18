@@ -4,6 +4,8 @@ import sysv_ipc
 import numpy as np
 import cv2
 import linefuncs as f
+import random as rng
+rng.seed(12345)
 
 # range for identifying blue cones in HSV
 bluRanges = [
@@ -45,40 +47,56 @@ while True:
     img = img[200:480, 0:640] # remove the top of the image
 
     blur = cv2.GaussianBlur(img, (5, 5), 0)
-    hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     pts = np.array(((0, 280), (0, 170), (200, 130), (420, 135), (640, 190),
         (640, 280), (0, 280))).astype(np.int32)
-    cv2.fillPoly(hsv, [pts], (0, 0, 0)) # black out the car
+    cv2.fillPoly(hsv, [pts], (255, 255, 255)) # black out the car
 
-    bluCones = f.findCones(hsv, bluRanges)
-    ylwCones = f.findCones(hsv, ylwRanges)
-    orgCones = f.findCones(hsv, orgRanges)
-    for cone in bluCones:
-        f.cross(img, cone, (255, 0, 0))
-    for cone in ylwCones:
-        f.cross(img, cone, (0, 255, 255))
-    for cone in orgCones:
-        f.cross(img, cone, (0, 140, 255))
+    #find the black part, the range can be calibrated in the future
+    inRange = cv2.inRange(hsv, (0,0,0), (30,30,30))
+    cv2.imshow("inRange", inRange)
 
-    if len(orgCones) > 0:
-        f.classifyOrgCones(orgCones, bluCones, ylwCones)
+    kernel = np.ones((3, 3), np.uint8)
+    #erode = cv2.erode(inRange, kernel, iterations=1)
+    #cv2.imshow("erode", erode)
+    dilate = cv2.dilate(inRange, kernel, iterations=12)
+    # cv2.imshow("dilate", dilate)
 
-    if len(bluCones) == 0: bluCones = [(img.shape[1]-1, 0)]
-    if len(ylwCones) == 0: ylwCones = [(0, 0)]
+    contours, _ = cv2.findContours(dilate, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
-    bluPts = f.addPoints(bluCones, img.shape[1], img.shape[0])
-    ylwPts = f.addPoints(ylwCones, img.shape[1], img.shape[0])
-    midPts = f.calcMiddleLine(bluPts, ylwPts)
-    for i in range(1, len(bluPts)):
-        cv2.line(img, bluPts[i-1], bluPts[i], (255, 0, 0))
-    for i in range(1, len(ylwPts)):
-        cv2.line(img, ylwPts[i-1], ylwPts[i], (0, 255, 255))
-    for i in range(1, len(midPts)):
-        cv2.line(img, midPts[i-1], midPts[i], (0, 255, 0))
 
-    xMid = round(img.shape[1]/2)
-    dx = f.distanceFromMiddle(midPts, round(img.shape[1])/2, ySteering)
-    cv2.arrowedLine(img, (xMid, ySteering), (xMid + dx, ySteering), (0, 0, 255))
 
-    cv2.imshow("img", img)
+    if len(contours) != 0:
+        # draw in blue the contours that were founded
+        cv2.drawContours(dilate, contours, -1, 255, 3)
+
+        
+        #c = max(contours, key = cv2.contourArea)
+
+        #find the biggest area
+        contour_sizes = [(cv2.contourArea(contour), contour) for contour in contours]
+        biggest_contour = max(contour_sizes, key=lambda x: x[0])[1]
+        print(cv2.contourArea(biggest_contour))
+
+        #filter out the false positie
+        if cv2.contourArea(biggest_contour) > 750: #2800:
+
+            x,y,w,h = cv2.boundingRect(biggest_contour)
+            mu = cv2.moments(biggest_contour)
+             #get the mass center
+            mc = (mu['m10']  / (mu['m00'] + 1e-5), mu['m01'] / (mu['m00'] + 1e-5))
+            # draw 
+            cv2.rectangle(img,(x,y),(x+w,y+h),(10,255,250),2)
+            cv2.circle(img, (int(mc[0]), int(mc[1])), 4, (10,255,250), -1)
+
+            ## I guess dy/dx and current speed can show us whether the target car is running or parking
+            print("x:",(int(mc[0])))
+            print("y:",(int(mc[1])))
+
+
+
+
+    cv2.imshow("dilate", img)
+
+
     cv2.waitKey(1)
