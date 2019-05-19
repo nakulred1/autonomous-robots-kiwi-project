@@ -11,10 +11,10 @@ import vision, motion
 # y-coordinate of line to check for steering direction
 ySteering = 100
 
-maxPedalPosition = 0.16
+maxPedalPosition = 0.12
 
 maxGroundSteering = 0.08
-minGroundSteering = 0.01
+minGroundSteering = 0.0
 groundSteeringMultiplier = 2.5
 groundSteeringDMultiplier = 0.0
 steeringOffset = 0.04 # 0 is not straight ahead
@@ -252,7 +252,7 @@ while True:
 
     if state == "continueAfterIntersection":
         pedalPosition = calcPedalPosition(steer, dSteer)
-        groundSteering - calcGroundSteering(steer, dSteer)
+        groundSteering = calcGroundSteering(steer, dSteer)
 
         if len(orgCones) == 0:
             # next intersection will be the reverse from this one

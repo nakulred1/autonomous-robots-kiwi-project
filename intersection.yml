@@ -8,7 +8,7 @@ services:
         volumes:
         - /tmp:/tmp
         - .:/opt/sources
-        working_dir: /opt/sources/combined
+        working_dir: /opt/sources/intersection
         command: "./combined.py"
         environment:
         - PYTHONUNBUFFERED=1 # fix python prints
