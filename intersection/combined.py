@@ -219,9 +219,9 @@ while True:
         classifyOrgCones(orgCones, bluCones, ylwCones)
 
     seeCar = False
-#    seeCar = checkForCar(img)
-#    if seeCar:
-#        lastSeenCar = time.time()
+    seeCar = vision.checkForCar(img)
+    if seeCar:
+        lastSeenCar = time.time()
 
     steer, dSteer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
