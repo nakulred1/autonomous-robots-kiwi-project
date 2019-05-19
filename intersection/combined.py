@@ -28,14 +28,16 @@ distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
 #steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
 steerThrottle = {"minSteer": 1, "maxSteer": 1, "pedalPosition": 0.14}
 
-lastSeen = 0
+lastSeenCones = 0
 timeout = 1 # stop if no cones have been seen for this long
 
 state = "drive"
 
-# used by the waitAtIntersection state
-lastMotion = None
-waitTimeout = 2
+# used by the intersection states
+lastSeenCar = 0
+intersectionApproachTime = 5
+waitTimeout = 0.5 # min time to wait when no car has been seen
+carWaitTimeout = 10 # min time to wait when a car has been seen
 trafficFromRight = True # has to be changed depending on where the car starts
 
 
@@ -216,41 +218,57 @@ while True:
     if len(orgCones) > 2:
         classifyOrgCones(orgCones, bluCones, ylwCones)
 
+    seeCar = False
+#    seeCar = checkForCar(img)
+#    if seeCar:
+#        lastSeenCar = time.time()
+
     steer, dSteer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
     if state == "drive":
         if steer == None:
-            if time.time() - lastSeen < timeout:
+            if time.time() - lastSeenCones < timeout:
                 continue
             print('timeout')
             pedalPosition = 0
             groundSteering = steeringOffset
         else:
-            lastSeen = time.time()
+            lastSeenCones = time.time()
             pedalPosition = calcPedalPosition(steer, dSteer)
             groundSteering = calcGroundSteering(steer, dSteer)
 
         if len(orgCones) > 0:
             if trafficFromRight:
-                lastMotion = time.time()
-                print('drive -> waitAtIntersection')
-                state = "waitAtIntersection"
+                startedWaitingTime = time.time()
+                if time.time() - lastSeenCar < intersectionApproachTime:
+                    print('drive -> waitForCar')
+                    state = 'waitForCar'
+                else:
+                    print('drive -> waitAtIntersection')
+                    state = "waitAtIntersection"
             else:
                 print('drive -> continueAfterIntersection')
                 state = "continueAfterIntersection"
+
+    if state == 'waitForCar':
+        pedalPosition = 0
+        groundSteering = steeringOffset
+
+        if seeCar or time.time() - startedWaitingTime > carWaitTimeout:
+            print('waitForCar -> waitAtIntersection')
+            state = 'waitAtIntersection'
 
     if state == "waitAtIntersection":
         pedalPosition = 0
         groundSteering = steeringOffset
 
-        if motion.checkForMotion(img):
-            lastMotion = time.time()
-
-        if time.time() - lastMotion > waitTimeout:
+        if not seeCar and time.time() - startedWaitingTime > waitTimeout:
             print('waitAtIntersection -> continueAfterIntersection')
             state = "continueAfterIntersection"
 
     if state == "continueAfterIntersection":
+        if steer == None:
+            continue
         pedalPosition = calcPedalPosition(steer, dSteer)
         groundSteering = calcGroundSteering(steer, dSteer)
 

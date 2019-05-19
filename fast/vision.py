@@ -45,7 +45,7 @@ def _findConesInImg(img, hsvRanges, contrastFilter=[], hsvCRanges=[]):
     erode = cv2.erode(cones, kernel, iterations=2)
     dilate = cv2.dilate(erode, kernel, iterations=2)
 
-    contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL,
+    _, contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL,
             cv2.CHAIN_APPROX_SIMPLE)
     conePos = []
     for contour in contours:
