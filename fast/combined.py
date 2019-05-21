@@ -5,18 +5,16 @@ import numpy as np
 import OD4Session
 import message_set_pb2 as messages
 
-import vision, motion
-
+import vision_parallel as vision
 
 # y-coordinate of line to check for steering direction
-ySteering = 100
+ySteering = 80
 
-maxPedalPosition = 0.16
+maxPedalPosition = 0.175
 
-maxGroundSteering = 0.08
-minGroundSteering = 0.01
+maxGroundSteering = 0.07
+minGroundSteering = 0.0
 groundSteeringMultiplier = 2.5
-groundSteeringDMultiplier = 0.0
 steeringOffset = 0.04 # 0 is not straight ahead
 
 # limit the pedal position linearly from max to threshold (at which the car
@@ -26,18 +24,10 @@ distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
 # limit the pedal position linearly from max to "pedalPosition" when
 # minSteer < steer < maxSteer
 #steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
-steerThrottle = {"minSteer": 1, "maxSteer": 1, "pedalPosition": 0.14}
+steerThrottle = {"minSteer": 0.6, "maxSteer": 0.7, "pedalPosition": 0.14}
 
 lastSeen = 0
 timeout = 1 # stop if no cones have been seen for this long
-
-state = "drive"
-
-# used by the waitAtIntersection state
-lastMotion = None
-waitTimeout = 2
-trafficFromRight = True # has to be changed depending on where the car starts
-
 
 cid = 112
 
@@ -85,27 +75,7 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
 
-minOrgConesDx = 10
-def classifyOrgCones(orgCones, bluCones, ylwCones):
-    # assume that the largest "hole" in the x-direction between orange cones
-    # is the lane and add cones to the left to the yellow cones and cones to
-    # the right to the blue
-    orgCones.sort(key=lambda pt: pt[0])
-    maxDx = 0
-    iMaxDx = 0
-    for i in range(1, len(orgCones)):
-        dx = orgCones[i][0] - orgCones[i-1][0]
-        if dx > maxDx:
-            maxDx = dx
-            iMaxDx = i
-
-    if maxDx > minOrgConesDx:
-        bluCones.extend(orgCones[iMaxDx:])
-        bluCones.sort(key=lambda pt: pt[1])
-        ylwCones.extend(orgCones[0:iMaxDx])
-        ylwCones.sort(key=lambda pt: pt[1])
-
-def calcPedalPosition(steer, dSteer):
+def calcPedalPosition(steer):
     distMaxPedalPosition = maxPedalPosition
     if distances["front"] < distanceThrottle["max"]:
         distMaxPedalPosition = (maxPedalPosition -
@@ -128,22 +98,15 @@ def calcPedalPosition(steer, dSteer):
 
     return min(distMaxPedalPosition, steerMaxPedalPosition)
 
-def calcGroundSteering(steer, dSteer):
-    P = groundSteeringMultiplier * steer
-    D = groundSteeringDMultiplier * dSteer
-    groundSteering = -(min(P + D, 1) * maxGroundSteering + steeringOffset)
+def calcGroundSteering(steer):
+    groundSteering = -(min(groundSteeringMultiplier * steer * maxGroundSteering, maxGroundSteering) +
+            steeringOffset)
     if abs(groundSteering) < minGroundSteering:
         groundSteering = math.copysign(minGroundSteering, groundSteering)
     return groundSteering
 
-
-prevSteer = 0
-prevSteerTime = time.time()
 def calcSteer(bluCones, ylwCones, xSize, ySize):
-    global prevSteer
-    global prevSteerTime
-
-    if len(bluCones) == 0 and len(ylwCones) == 0: return None, None
+    if len(bluCones) == 0 and len(ylwCones) == 0: return
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -155,11 +118,8 @@ def calcSteer(bluCones, ylwCones, xSize, ySize):
     dx = distanceFromMiddle(midPts, xMid, ySteering)
 
     steer = dx / (xSize / 2)
-    dSteer = (steer - prevSteer) / (time.time() - prevSteerTime)
-    prevSteer = steer
-    prevSteerTime = time.time()
-    print('steer=%f dSteer=%f' % (steer, dSteer))
-    return steer, dSteer
+    print('steer=%f' % steer)
+    return steer
 
 
 distances = { "front": 0.0, "left": 0.0, "right": 0.0, "rear": 0.0 };
@@ -201,6 +161,8 @@ session.registerMessageCallback(1039, onDistance,
 atexit.register(stop)
 session.connect()
 
+totalTime = 0
+numTime = 0
 while True:
     cond.Z()
 
@@ -210,56 +172,24 @@ while True:
     shm.detach()
     mutex.release()
 
-    img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
+    t = time.time()
+    bluCones, ylwCones, xSize, ySize = vision.findCones(buf)
+    totalTime += time.time() - t
+    numTime += 1
+    print('time:', totalTime/numTime)
 
-    bluCones, ylwCones, orgCones, xSize, ySize = vision.findCones(img)
-    if len(orgCones) > 2:
-        classifyOrgCones(orgCones, bluCones, ylwCones)
+    steer = calcSteer(bluCones, ylwCones, xSize, ySize)
 
-    steer, dSteer = calcSteer(bluCones, ylwCones, xSize, ySize)
-
-    if state == "drive":
-        if steer == None:
-            if time.time() - lastSeen < timeout:
-                continue
-            print('timeout')
-            pedalPosition = 0
-            groundSteering = steeringOffset
-        else:
-            lastSeen = time.time()
-            pedalPosition = calcPedalPosition(steer, dSteer)
-            groundSteering = calcGroundSteering(steer, dSteer)
-
-        if len(orgCones) > 0:
-            if trafficFromRight:
-                lastMotion = time.time()
-                print('drive -> waitAtIntersection')
-                state = "waitAtIntersection"
-            else:
-                print('drive -> continueAfterIntersection')
-                state = "continueAfterIntersection"
-
-    if state == "waitAtIntersection":
+    if steer == None:
+        if time.time() - lastSeen < timeout:
+            continue
+        print('timeout')
         pedalPosition = 0
         groundSteering = steeringOffset
-
-        if motion.checkForMotion(img):
-            lastMotion = time.time()
-
-        if time.time() - lastMotion > waitTimeout:
-            print('waitAtIntersection -> continueAfterIntersection')
-            state = "continueAfterIntersection"
-
-    if state == "continueAfterIntersection":
-        pedalPosition = calcPedalPosition(steer, dSteer)
-        groundSteering - calcGroundSteering(steer, dSteer)
-
-        if len(orgCones) == 0:
-            # next intersection will be the reverse from this one
-            trafficFromRight = not trafficFromRight
-
-            print('continueAfterIntersection -> drive')
-            state = "drive"
+    else:
+        lastSeen = time.time()
+        pedalPosition = calcPedalPosition(steer)
+        groundSteering = calcGroundSteering(steer)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering

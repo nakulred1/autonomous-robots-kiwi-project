@@ -3,6 +3,5 @@
 
 docker run --rm -v $PWD:/opt/sources python3-runner /bin/sh -c \
 	'make -C set-steering clean && make -C set-steering && \
-	 make -C simple-vision clean && make -C simple-vision && \
-	 make -C simple-control clean && make -C simple-control && \
-	 make -C combined clean && make -C combined'
+	 make -C fast clean && make -C fast && \
+	 make -C intersection clean && make -C intersection'
