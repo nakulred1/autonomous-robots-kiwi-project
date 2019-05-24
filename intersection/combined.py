@@ -21,12 +21,12 @@ steeringOffset = 0.04 # 0 is not straight ahead
 
 # limit the pedal position linearly from max to threshold (at which the car
 # stops moving) when min < frontDistance < max
-distanceThrottle = {"max": 0, "min": 0, "threshold": 0.08}
+distanceThrottle = {"max": 0.7, "min": 0.3, "threshold": 0.08}
 
 # limit the pedal position linearly from max to "pedalPosition" when
 # minSteer < steer < maxSteer
 #steerThrottle = {"minSteer": 0.5, "maxSteer": 0.7, "pedalPosition": 0.14}
-steerThrottle = {"minSteer": 1, "maxSteer": 1, "pedalPosition": 0.14}
+steerThrottle = {"minSteer": 10, "maxSteer": 11, "pedalPosition": 0.14}
 
 lastSeenCones = 0
 timeout = 1 # stop if no cones have been seen for this long
@@ -36,7 +36,7 @@ state = "drive"
 # used by the intersection states
 lastSeenCar = 0
 intersectionApproachTime = 5
-waitTimeout = 0.5 # min time to wait when no car has been seen
+waitTimeout = 2 # min time to wait when no car has been seen
 carWaitTimeout = 10 # min time to wait when a car has been seen
 trafficFromRight = True # has to be changed depending on where the car starts
 
@@ -87,7 +87,7 @@ def distanceFromMiddle(pts, xMid, y):
     x = np.interp(y, pts[:,1], pts[:,0])
     return round(x - xMid)
 
-minOrgConesDx = 10
+minOrgConesDx = 50
 def classifyOrgCones(orgCones, bluCones, ylwCones):
     # assume that the largest "hole" in the x-direction between orange cones
     # is the lane and add cones to the left to the yellow cones and cones to
@@ -214,13 +214,12 @@ while True:
 
     img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
 
-    bluCones, ylwCones, orgCones, xSize, ySize = vision.findCones(img)
+    bluCones, ylwCones, orgCones, xSize, ySize, seeCar = vision.processImage(
+        img, state == "waitForCar" or state == "waitAtIntersection")
     if len(orgCones) > 2:
         classifyOrgCones(orgCones, bluCones, ylwCones)
-
-    seeCar = False
-    seeCar = vision.checkForCar(img)
     if seeCar:
+        print('See car')
         lastSeenCar = time.time()
 
     steer, dSteer = calcSteer(bluCones, ylwCones, xSize, ySize)
@@ -255,7 +254,8 @@ while True:
         groundSteering = steeringOffset
 
         if seeCar or time.time() - startedWaitingTime > carWaitTimeout:
-            print('waitForCar -> waitAtIntersection')
+            print('waitForCar -> waitAtIntersection',
+                seeCar, time.time() - startedWaitingTime)
             state = 'waitAtIntersection'
 
     if state == "waitAtIntersection":
@@ -285,7 +285,7 @@ while True:
 
     # don't know why, but if this is not here the second message often gets
     # dropped...
-    time.sleep(0.001)
+    #time.sleep(0.001)
 
     pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
     pedalPositionRequest.position = pedalPosition
