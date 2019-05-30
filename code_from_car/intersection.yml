@@ -1,0 +1,14 @@
+version: '2'
+
+services:
+    combined:
+        image: python3-runner:latest
+        network_mode: "host"
+        ipc: "host"
+        volumes:
+        - /tmp:/tmp
+        - .:/opt/sources
+        working_dir: /opt/sources/intersection
+        command: "./combined.py"
+        environment:
+        - PYTHONUNBUFFERED=1 # fix python prints
