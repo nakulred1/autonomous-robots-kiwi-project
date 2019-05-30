@@ -20,7 +20,7 @@ orgRanges = [
     [(0, 80, 110), (8, 180, 200)]
 ]
 
-minOrgArea = 30 # only detect cones that are larger (closer) than this
+minOrgArea = 60 # only detect intersection when its cones are larger than this
 
 
 def _findConesInImg(img, hsvRanges, minArea=0):
@@ -37,11 +37,16 @@ def _findConesInImg(img, hsvRanges, minArea=0):
     _, contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL,
             cv2.CHAIN_APPROX_SIMPLE)
     conePos = []
+    largeCones = False
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
+        conePos.append((x + int(w/2), y + h))
         if w*h > minArea:
-            conePos.append((x + int(w/2), y + h))
+            largeCones = True
     conePos.sort(key=lambda pt: pt[1])
+
+    if minArea > 0:
+        return conePos, largeCones
     return conePos
 
 def _findCarInImg(img):
@@ -56,7 +61,6 @@ def _findCarInImg(img):
     Flag_CarFound = False
 
     if len(contours) != 0:
-        # TODO see if boundingRect is faster than contourArea and use the fastest
         #find the biggest area
         contour_sizes = [(cv2.contourArea(contour), contour) for contour in contours]
         #to make it simple, guess the largest one is the target car
@@ -83,14 +87,15 @@ def processImage(img, atIntersection):
     else:
         carHsv = hsv[0:130, 420:640]
 
+    carRes = pool.apply_async(_findCarInImg, (carHsv,))
     bluRes = pool.apply_async(_findConesInImg, (hsv, bluRanges))
     ylwRes = pool.apply_async(_findConesInImg, (hsv, ylwRanges))
     orgRes = pool.apply_async(_findConesInImg, (hsv, orgRanges, minOrgArea))
-    carRes = pool.apply_async(_findCarInImg, (carHsv,))
 
+    carFound = carRes.get(1000)
     bluCones = bluRes.get(1000)
     ylwCones = ylwRes.get(1000)
-    orgCones = orgRes.get(1000)
-    carFound = carRes.get(1000)
+    orgCones, intersectionFound = orgRes.get(1000)
 
-    return bluCones, ylwCones, orgCones, img.shape[1], img.shape[2], carFound
+    return (bluCones, ylwCones, orgCones, img.shape[1], img.shape[0], carFound,
+        intersectionFound)

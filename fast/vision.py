@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from multiprocessing import Pool
 import numpy as np
 import cv2
 
@@ -8,10 +9,11 @@ bluRanges = [
     [(97, 78, 35), (130, 255, 100)]
 ]
 
+# range for identifying blue cones with contrast filter in HSV
 bluCRanges = [
     [(94, 50, 35), (130, 255, 100)],
     [(70, 30, 25), (98, 110, 80)],
-    [(100, 12, 30), (180, 80, 130)]
+    [(100, 10, 30), (180, 80, 140)]
 ]
 
 # range for identifying yellow cones in HSV
@@ -53,6 +55,15 @@ def _findConesInImg(img, hsvRanges, contrastFilter=[], hsvCRanges=[]):
         conePos.append((x + int(w/2), y + h))
     return conePos
 
+def _findBluCones(hsv, blur, pts):
+    gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY)
+    grad = cv2.convertScaleAbs(cv2.Sobel(gray, cv2.CV_16S, 1, 0))
+    cv2.fillPoly(grad, [pts], 0)
+    grad = cv2.boxFilter(grad, -1, (18, 18))
+    contrastFilter = cv2.inRange(grad, 18, 255)
+    return _findConesInImg(hsv, bluRanges, contrastFilter, bluCRanges)
+
+pool = Pool(processes=2)
 def findCones(buf):
     img = np.frombuffer(buf, np.uint8).reshape(480, 640, 4)
     img = img[200:390, 0:640] # remove the top and bottom of the image
@@ -64,15 +75,13 @@ def findCones(buf):
         (0, 190))).astype(np.int32)
     cv2.fillPoly(hsv, [pts], (0, 0, 0)) # black out the car
 
-    gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY)
-    grad = cv2.convertScaleAbs(cv2.Sobel(gray, cv2.CV_16S, 1, 0))
-    cv2.fillPoly(grad, [pts], 0)
-    grad = cv2.boxFilter(grad, -1, (18, 18))
-    contrastFilter = cv2.inRange(grad, 18, 255)
+    bluRes = pool.apply_async(_findBluCones, (hsv, blur, pts))
+    ylwRes = pool.apply_async(_findConesInImg, (hsv, ylwRanges))
+    orgRes = pool.apply_async(_findConesInImg, (hsv, orgRanges))
 
-    bluCones = _findConesInImg(hsv, bluRanges, contrastFilter, bluCRanges)
-    ylwCones = _findConesInImg(hsv, ylwRanges)
-    orgCones = _findConesInImg(hsv, orgRanges)
+    bluCones = bluRes.get(1000)
+    ylwCones = ylwRes.get(1000)
+    orgCones = orgRes.get(1000)
 
     orgCones.sort(key=lambda pt: pt[0])
     if len(orgCones) == 2 and orgCones[1][0] - orgCones[0][0] > 50:

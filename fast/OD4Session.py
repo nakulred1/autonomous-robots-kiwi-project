@@ -50,7 +50,7 @@ class OD4Session:
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, req)
         self.isConnected = True
         if not self.isRunning:
-            _thread.start_new_thread(self.__runner, ())
+            #_thread.start_new_thread(self.__runner, ())
             self.isRunning = True
 
 

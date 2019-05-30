@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
 
-import sys, time, atexit, signal, math
+import sys, time, atexit, signal, math, sysv_ipc
 import numpy as np
 import OD4Session
 import message_set_pb2 as messages
 
+import vision
 
 # y-coordinate of line to check for steering direction
-ySteering = 100
+ySteering = 70
 
-maxPedalPosition = 0.0
-pedalPositionThreshold = 0.08 # pedal position at which the car stops moving
+maxPedalPosition = 0.18
 
 maxGroundSteering = 0.08
-minGroundSteering = 0.01
-groundSteeringMultiplier = 2.5
-steeringOffset = 0.04 # 0 is not straight ahead
+minGroundSteering = 0
+groundSteeringMultiplier = 2
+steeringOffset = 0.035 # 0 is not straight ahead
+setPointXOffset = 40 # offset from the middle of the image on the x axis
 
-# limit the pedal position linearly from max to the threshold when
-# min < frontDistance < max
-throttleDistances = {"max": 0.5, "min": 0.1}
+# limit the pedal position linearly from max to "pedalPosition" when
+# minSteer < steer < maxSteer
+steerThrottle = {"minSteer": 0.6, "maxSteer": 0.7, "pedalPosition": 0.15}
 
-msgTimeout = 1 # stop if no cone messages have been received for this long
+lastSeen = 0
+timeout = 1 # stop if no cones have been seen for this long
 
 cid = 112
-freq = 10
 
 
 def addPoints(cones, w, h):
@@ -65,46 +66,35 @@ def calcMiddleLine(bluPts, ylwPts):
 
     return pts
 
-def distanceFromMiddle(pts, xMid, y):
+def distanceFromSetpoint(pts, xMid, y):
     pts = np.array(pts)
     x = np.interp(y, pts[:,1], pts[:,0])
-    return round(x - xMid)
+    return round(x - xMid + setPointXOffset)
 
-def calcPedalPosition():
-    if distances["front"] >= throttleDistances["max"]:
-        return maxPedalPosition
-    else:
-        print('frontDistance < 0.3')
-        return (maxPedalPosition -
-            (maxPedalPosition - pedalPositionThreshold) *
-            ((throttleDistances["max"] - distances["front"]) /
-             (throttleDistances["max"] - throttleDistances["min"])))
+def calcPedalPosition(steer):
+    steerMaxPedalPosition = maxPedalPosition
+    steer = abs(steer) # don't care about the sign in this function
+    if steer > steerThrottle["minSteer"]:
+        if steer >= steerThrottle["maxSteer"]:
+            steerMaxPedalPosition = steerThrottle["pedalPosition"]
+        else:
+            steerMaxPedalPosition = (maxPedalPosition -
+                (maxPedalPosition - steerThrottle["pedalPosition"]) *
+                ((steer - steerThrottle["minSteer"]) /
+                 (steerThrottle["maxSteer"] - steerThrottle["minSteer"])))
+        print('steerThrottle:', steerMaxPedalPosition)
 
-def calcGroundSteering():
+    return steerMaxPedalPosition
+
+def calcGroundSteering(steer):
     groundSteering = -(min(groundSteeringMultiplier * steer * maxGroundSteering, maxGroundSteering) +
             steeringOffset)
     if abs(groundSteering) < minGroundSteering:
         groundSteering = math.copysign(minGroundSteering, groundSteering)
     return groundSteering
 
-
-lastConeMsg = time.time()
-steer = 0
-numMsgs = 0
-def onCones(msg, senderStamp, timeStamps):
-    global lastConeMsg
-    global steer
-    global numMsgs
-
-    xSize = msg.xSize
-    ySize = msg.ySize
-    bluCones = np.frombuffer(msg.blueCones, dtype='uint16').reshape(-1, 2)
-    bluCones = [tuple(pt) for pt in bluCones.tolist()]
-    ylwCones = np.frombuffer(msg.yellowCones, dtype='uint16').reshape(-1, 2)
-    ylwCones = [tuple(pt) for pt in ylwCones.tolist()]
-
-    # Treat a message with no cones as no message at all
-    if len(bluCones) == 0 and len(ylwCones) == 0: return
+def calcSteer(bluCones, ylwCones, xSize, ySize):
+    if len(bluCones) == 0 and len(ylwCones) == 0: return None
     if len(bluCones) == 0: bluCones = [(xSize-1, 0)]
     if len(ylwCones) == 0: ylwCones = [(0, 0)]
 
@@ -113,24 +103,11 @@ def onCones(msg, senderStamp, timeStamps):
     midPts = calcMiddleLine(bluPts, ylwPts)
 
     xMid = round(xSize / 2)
-    dx = distanceFromMiddle(midPts, xMid, ySteering)
+    dx = distanceFromSetpoint(midPts, xMid, ySteering)
 
-    lastConeMsg = time.time()
     steer = dx / (xSize / 2)
-    groundSteering = steer * maxGroundSteering
     print('steer=%f' % steer)
-
-distances = { "front": 0.0, "left": 0.0, "right": 0.0, "rear": 0.0 };
-def onDistance(msg, senderStamp, timeStamps):
-    if senderStamp == 0:
-        print("frontDistance=%f" % msg.distance)
-        distances["front"] = msg.distance
-    elif senderStamp == 1:
-        distances["left"] = msg.distance
-    elif senderStamp == 2:
-        distances["rear"] = msg.distance
-    elif senderStamp == 3:
-        distances["right"] = msg.distance
+    return steer
 
 def stop():
     print('stopping')
@@ -140,41 +117,60 @@ def stop():
         pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
         pedalPositionRequest.position = 0
         session.send(1086, pedalPositionRequest.SerializeToString())
-        time.sleep(1/freq)
+        time.sleep(0.1)
 
 def onSigterm():
     sys.exit(0)
 signal.signal(signal.SIGTERM, onSigterm)
 
+imgPath = "/tmp/img.argb"
+keySharedMemory = sysv_ipc.ftok(imgPath, 1, True)
+keySemMutex = sysv_ipc.ftok(imgPath, 2, True)
+keySemCondition = sysv_ipc.ftok(imgPath, 3, True)
+shm = sysv_ipc.SharedMemory(keySharedMemory)
+mutex = sysv_ipc.Semaphore(keySemMutex)
+cond = sysv_ipc.Semaphore(keySemCondition)
+
 session = OD4Session.OD4Session(cid)
-session.registerMessageCallback(1500, onCones, messages.tme290_Cones)
-session.registerMessageCallback(1039, onDistance,
-        messages.opendlv_proxy_DistanceReading)
 atexit.register(stop)
 session.connect()
 
+totalTime = 0
+numTime = 0
 while True:
-    # Stop the car if we haven't received any cone messages for a long time or
-    # we don't see any cones
-    if time.time() - lastConeMsg > msgTimeout:
-        print('timeout:', numMsgs)
+    cond.Z()
+
+    t = time.time()
+
+    mutex.acquire()
+    shm.attach()
+    buf = shm.read()
+    shm.detach()
+    mutex.release()
+
+    bluCones, ylwCones, xSize, ySize = vision.findCones(buf)
+    steer = calcSteer(bluCones, ylwCones, xSize, ySize)
+
+    if steer == None:
+        # stop if no cones have been since for a while
+        if time.time() - lastSeen < timeout:
+            continue
+        print('timeout')
         pedalPosition = 0
-        groundSteering =0
+        groundSteering = steeringOffset
     else:
-        pedalPosition = calcPedalPosition()
-        groundSteering = calcGroundSteering()
-    print(pedalPosition)
+        lastSeen = time.time()
+        pedalPosition = calcPedalPosition(steer)
+        groundSteering = calcGroundSteering(steer)
 
     groundSteeringRequest = messages.opendlv_proxy_GroundSteeringRequest()
     groundSteeringRequest.groundSteering = groundSteering
     session.send(1090, groundSteeringRequest.SerializeToString())
 
-    # don't know why, but if this is not here the second message often gets
-    # dropped...
-    time.sleep(0.001)
-
     pedalPositionRequest = messages.opendlv_proxy_PedalPositionRequest()
     pedalPositionRequest.position = pedalPosition
     session.send(1086, pedalPositionRequest.SerializeToString())
 
-    time.sleep(1/freq)
+    totalTime += time.time() - t
+    numTime += 1
+    print('time:', totalTime/numTime)

@@ -9,6 +9,6 @@ services:
         - /tmp:/tmp
         - .:/opt/sources
         working_dir: /opt/sources/intersection
-        command: "./combined.py"
+        command: "./intersection.py"
         environment:
         - PYTHONUNBUFFERED=1 # fix python prints

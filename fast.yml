@@ -9,6 +9,6 @@ services:
         - /tmp:/tmp
         - .:/opt/sources
         working_dir: /opt/sources/fast
-        command: "./combined.py"
+        command: "./fast.py"
         environment:
         - PYTHONUNBUFFERED=1 # fix python prints

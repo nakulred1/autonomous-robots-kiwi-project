@@ -11,7 +11,7 @@ bluRanges = [[(97, 78, 35), (130, 255, 100)]]
 bluCRanges = [
     [(94, 50, 35), (130, 255, 100)],
     [(70, 30, 25), (98, 110, 80)],
-    [(100, 12, 30), (180, 80, 130)]
+    [(100, 10, 30), (180, 80, 140)]
 ]
 
 # range for identifying yellow cones in HSV
@@ -24,7 +24,7 @@ orgRanges = [
 ]
 
 # y-coordinate of line to check for steering direction
-ySteering = 100
+ySteering = 70
 
 
 imgPath = "/tmp/img.argb"
@@ -52,7 +52,7 @@ while True:
     gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY)
     grad = cv2.convertScaleAbs(cv2.Sobel(gray, cv2.CV_16S, 1, 0))
 
-    pts = np.array(((0, 190), (0, 170), (200, 130), (420, 135), (640, 190),
+    pts = np.array(((0, 190), (0, 165), (200, 125), (420, 130), (640, 190),
         (0, 190))).astype(np.int32)
     cv2.fillPoly(hsv, [pts], (0, 0, 0)) # black out the car
     cv2.fillPoly(grad, [pts], 0)

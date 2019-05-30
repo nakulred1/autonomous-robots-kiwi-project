@@ -13,7 +13,7 @@ shm = sysv_ipc.SharedMemory(keySharedMemory)
 mutex = sysv_ipc.Semaphore(keySemMutex)
 cond = sysv_ipc.Semaphore(keySemCondition)
 
-fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=60, detectShadows=False)
+fgbg = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=60, detectShadows=False)
 
 while True:
     cond.Z()

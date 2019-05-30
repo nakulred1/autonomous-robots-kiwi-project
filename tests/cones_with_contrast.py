@@ -80,7 +80,7 @@ blueCones = findCones(hsv,
         hsvCRanges=
         [[(94, 50, 35), (130, 255, 100)],
          [(70, 30, 25), (100, 110, 80)],
-         [(100, 12, 30), (180, 80, 130)]],
+         [(100, 10, 30), (180, 80, 140)]],
         contrastFilter=contrastFilter,
         verbose=True)
 yellowCones = findCones(hsv, [[(23, 60, 140), (32, 255, 255)]], verbose=False)
